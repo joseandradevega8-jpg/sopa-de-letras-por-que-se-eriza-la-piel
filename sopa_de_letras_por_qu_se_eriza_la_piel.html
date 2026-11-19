@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sopa de Letras: ¿Por qué se eriza la piel?</title>
+    <!-- Tailwind CSS para diseño moderno, responsivo y limpio -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fuente Inter para legibilidad científica -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0284c7 100%);
+            min-height: 100vh;
+            color: #1e293b;
+        }
+
+        /* Estilos personalizados para la cuadrícula interactiva de la sopa de letras */
+        .word-grid {
+            display: grid;
+            grid-template-columns: repeat(14, minmax(0, 1fr));
+            gap: 2px;
+            touch-action: none; /* Evita scroll al arrastrar en pantallas táctiles */
+            user-select: none;
+        }
+
+        .grid-cell {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: clamp(0.75rem, 2vw, 1.05rem);
+            background-color: #ffffff;
+            color: #1e293b;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.1s ease, background-color 0.15s ease, color 0.15s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .grid-cell:hover {
+            background-color: #e0f2fe;
+            color: #0369a1;
+        }
+
+        /* Celda seleccionada actualmente mientras el usuario arrastra */
+        .grid-cell.selecting {
+            background-color: #0284c7 !important;
+            color: #ffffff !important;
+            transform: scale(1.06);
+            z-index: 10;
+            box-shadow: 0 4px 10px rgba(2, 132, 199, 0.4);
+        }
+
+        /* Celda que pertenece a una palabra ya encontrada */
+        .grid-cell.found {
+            color: #ffffff !important;
+            animation: popFound 0.35s ease;
+        }
+
+        /* Celda resaltada temporalmente como pista */
+        .grid-cell.hint-highlight {
+            background-color: #f59e0b !important;
+            color: #ffffff !important;
+            animation: pulseHint 1s infinite;
+        }
+
+        @keyframes popFound {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes pulseHint {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* Barra de desplazamiento estilizada para el panel de preguntas */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body class="p-3 sm:p-6 md:p-8 flex flex-col items-center justify-center">
+
+    <!-- Contenedor Principal -->
+    <main class="w-full max-w-6xl bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl overflow-hidden border border-sky-200/50">
+        
+        <!-- Encabezado Científico -->
+        <header class="bg-gradient-to-r from-blue-900 via-blue-800 to-sky-700 text-white p-5 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="text-center md:text-left">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-300/30 text-sky-200 text-xs font-semibold uppercase tracking-wider mb-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    Biomoléculas y Fisiología
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">¿Por qué se eriza la piel?</h1>
+                <p class="text-sky-100 text-sm sm:text-base mt-1">Deduce las respuestas a las preguntas y encuéntralas en la sopa de letras.</p>
+            </div>
+
+            <!-- Indicador de Progreso -->
+            <div class="flex items-center gap-4 bg-blue-950/50 px-5 py-3 rounded-xl border border-sky-400/30 shrink-0">
+                <div class="text-right">
+                    <span class="text-xs text-sky-300 uppercase font-semibold block">Progreso</span>
+                    <span id="progressText" class="text-2xl font-extrabold text-white">0 / 8</span>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-sky-500/20 border-2 border-sky-400 flex items-center justify-center">
+                    <svg id="trophyIcon" class="w-6 h-6 text-sky-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+            </div>
+        </header>
+
+        <!-- Barra de Notificación / Estado -->
+        <div id="statusBanner" class="bg-sky-50 border-b border-sky-100 px-6 py-2.5 text-center text-sm font-medium text-sky-800 transition-all">
+            💡 Arrastra el cursor (o tu dedo) desde la primera hasta la última letra de cada palabra en línea recta.
+        </div>
+
+        <!-- Cuerpo Principal: Cuadrícula + Preguntas -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 p-4 sm:p-6 md:p-8">
+            
+            <!-- Columna Izquierda: Sopa de Letras y Controles (7 columnas en desktop) -->
+            <div class="lg:col-span-7 flex flex-col items-center">
+                <div class="w-full max-w-[540px] bg-slate-200/80 p-2 sm:p-3 rounded-xl shadow-inner border border-slate-300">
+                    <div id="wordGrid" class="word-grid"></div>
+                </div>
+
+                <!-- Botones de Acción -->
+                <div class="flex flex-wrap items-center justify-center gap-3 mt-5 w-full max-w-[540px]">
+                    <button id="btnHint" onclick="giveHint()" class="flex-1 min-w-[140px] inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-semibold rounded-xl shadow-md transition cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                        Pedir Pista
+                    </button>
+
+                    <button id="btnReveal" onclick="revealAll()" class="flex-1 min-w-[140px] inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-600 hover:bg-slate-700 active:scale-95 text-white font-semibold rounded-xl shadow-md transition cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                        Revelar Todo
+                    </button>
+
+                    <button id="btnReset" onclick="initGame()" class="flex-1 min-w-[140px] inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 active:scale-95 text-white font-semibold rounded-xl shadow-md transition cursor-pointer">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        Nuevo Tablero
+                    </button>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Trivia / Preguntas (5 columnas en desktop) -->
+            <div class="lg:col-span-5 flex flex-col bg-slate-50 rounded-xl border border-slate-200 p-4 sm:p-5">
+                <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-sky-600"></span>
+                        Cuestionario de Biomoléculas
+                    </h2>
+                    <span class="text-xs font-medium text-slate-500 bg-slate-200/70 px-2.5 py-1 rounded-md">8 conceptos</span>
+                </div>
+
+                <!-- Lista de Preguntas -->
+                <div id="questionsContainer" class="space-y-3 overflow-y-auto max-h-[520px] pr-1 custom-scrollbar">
+                    <!-- Se llena dinámicamente con JS -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal de Felicitación al completar todas las palabras -->
+    <div id="winModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl border border-sky-100 transform transition-all">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <h3 class="text-2xl font-extrabold text-slate-800 mb-2">¡Excelente trabajo!</h3>
+            <p class="text-slate-600 mb-6">Has encontrado todas las biomoléculas y conceptos clave sobre por qué se eriza la piel.</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="closeModal()" class="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold rounded-xl transition cursor-pointer">
+                    Ver tablero
+                </button>
+                <button onclick="closeModal(); initGame();" class="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl shadow-md transition cursor-pointer">
+                    Jugar de nuevo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // BASE DE DATOS DE PREGUNTAS Y RESPUESTAS
+        // Basada exclusivamente en el texto literal de la presentación
+        // ==========================================
+        const TRIVIA_DATA = [
+            {
+                id: 0,
+                word: "SIMPATICO",
+                color: "#10b981", // Esmeralda
+                question: "Nervios del sistema nervioso que controlan los músculos de la piel (encargados de la respuesta de lucha o huida):"
+            },
+            {
+                id: 1,
+                word: "FOLICULOS",
+                color: "#0ea5e9", // Cian
+                question: "Estructuras de nuestra piel donde pequeños músculos tiran del cabello o vello hacia arriba (en plural):"
+            },
+            {
+                id: 2,
+                word: "CALCIO",
+                color: "#8b5cf6", // Violeta
+                question: "Elemento que aumenta dentro de las células musculares gracias a la señal y se une a la calmodulina:"
+            },
+            {
+                id: 3,
+                word: "CALMODULINA",
+                color: "#ec4899", // Rosa
+                question: "Molécula a la que se une el calcio para activar la enzima quinasa de la cadena ligera de miosina:"
+            },
+            {
+                id: 4,
+                word: "ENZIMA",
+                color: "#f97316", // Naranja
+                question: "Catalizador biológico; proteína que acelera la velocidad de una reacción química específica en la célula:"
+            },
+            {
+                id: 5,
+                word: "MIOSINA",
+                color: "#14b8a6", // Turquesa
+                question: "Filamentos gruesos de los músculos que tienen mayor longitud que los delgados y generan energía transformando ATP:"
+            },
+            {
+                id: 6,
+                word: "ACTINA",
+                color: "#6366f1", // Índigo
+                question: "Filamentos delgados que interactúan con la miosina, usando ATP, para contraer el músculo:"
+            },
+            {
+                id: 7,
+                word: "ATP",
+                color: "#eab308", // Ámbar dorado
+                question: "Siglas de adenosín trifosfato, utilizado en la interacción entre actina y miosina para contraer el músculo:"
+            }
+        ];
+
+        const GRID_SIZE = 14;
+        const ALPHABET = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ";
+
+        // Direcciones posibles: horizontal, vertical y diagonales (adelante y atrás)
+        const DIRECTIONS = [
+            { dr: 0, dc: 1 },   // Derecha
+            { dr: 1, dc: 0 },   // Abajo
+            { dr: 1, dc: 1 },   // Diagonal abajo-derecha
+            { dr: -1, dc: 1 },  // Diagonal arriba-derecha
+            { dr: 0, dc: -1 },  // Izquierda
+            { dr: -1, dc: 0 },  // Arriba
+            { dr: 1, dc: -1 },  // Diagonal abajo-izquierda
+            { dr: -1, dc: -1 }  // Diagonal arriba-izquierda
+        ];
+
+        // Estado global del juego
+        let grid = [];
+        let placedWords = []; // Almacena coordenadas de cada palabra colocada
+        let foundWords = new Set();
+        let isSelecting = false;
+        let startCell = null;
+        let currentSelection = [];
+
+        // ==========================================
+        // INICIALIZACIÓN Y GENERACIÓN DEL TABLERO
+        // ==========================================
+        function initGame() {
+            foundWords.clear();
+            isSelecting = false;
+            startCell = null;
+            currentSelection = [];
+            placedWords = [];
+
+            // Crear matriz vacía
+            grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(''));
+
+            // Ordenar palabras de mayor a menor longitud para facilitar su colocación
+            const sortedTrivia = [...TRIVIA_DATA].sort((a, b) => b.word.length - a.word.length);
+
+            for (const item of sortedTrivia) {
+                placeWordInGrid(item);
+            }
+
+            // Rellenar espacios vacíos con letras aleatorias
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    if (grid[r][c] === '') {
+                        grid[r][c] = ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+                    }
+                }
+            }
+
+            renderGrid();
+            renderQuestions();
+            updateProgress();
+            setStatus("💡 Arrastra el cursor (o tu dedo) desde la primera hasta la última letra de cada palabra en línea recta.", "info");
+        }
+
+        // Intenta colocar una palabra en una posición y dirección aleatoria válida
+        function placeWordInGrid(item) {
+            const word = item.word;
+            let placed = false;
+            let attempts = 0;
+
+            while (!placed && attempts < 300) {
+                attempts++;
+                const dir = DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)];
+                const startR = Math.floor(Math.random() * GRID_SIZE);
+                const startC = Math.floor(Math.random() * GRID_SIZE);
+
+                const endR = startR + dir.dr * (word.length - 1);
+                const endC = startC + dir.dc * (word.length - 1);
+
+                // Verificar límites del tablero
+                if (endR < 0 || endR >= GRID_SIZE || endC < 0 || endC >= GRID_SIZE) {
+                    continue;
+                }
+
+                // Verificar colisiones (permite cruce si la letra coincide)
+                let canPlace = true;
+                const coords = [];
+                for (let i = 0; i < word.length; i++) {
+                    const r = startR + dir.dr * i;
+                    const c = startC + dir.dc * i;
+                    if (grid[r][c] !== '' && grid[r][c] !== word[i]) {
+                        canPlace = false;
+                        break;
+                    }
+                    coords.push({ r, c });
+                }
+
+                if (canPlace) {
+                    for (let i = 0; i < word.length; i++) {
+                        const { r, c } = coords[i];
+                        grid[r][c] = word[i];
+                    }
+                    placedWords.push({
+                        id: item.id,
+                        word: word,
+                        coords: coords
+                    });
+                    placed = true;
+                }
+            }
+        }
+
+        // ==========================================
+        // RENDERIZADO DE INTERFAZ
+        // ==========================================
+        function renderGrid() {
+            const gridContainer = document.getElementById('wordGrid');
+            gridContainer.innerHTML = '';
+
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    cell.textContent = grid[r][c];
+                    cell.dataset.r = r;
+                    cell.dataset.c = c;
+
+                    // Eventos de ratón
+                    cell.addEventListener('mousedown', (e) => handleStart(r, c, e));
+                    cell.addEventListener('mouseenter', () => handleMove(r, c));
+
+                    gridContainer.appendChild(cell);
+                }
+            }
+        }
+
+        // Eventos globales para soltar el clic y soporte táctil fluido
+        document.addEventListener('mouseup', handleEnd);
+
+        const wordGridEl = document.getElementById('wordGrid');
+        wordGridEl.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (target && target.classList.contains('grid-cell')) {
+                const r = parseInt(target.dataset.r);
+                const c = parseInt(target.dataset.c);
+                handleStart(r, c, e);
+            }
+        }, { passive: false });
+
+        wordGridEl.addEventListener('touchmove', (e) => {
+            if (!isSelecting) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (target && target.classList.contains('grid-cell')) {
+                const r = parseInt(target.dataset.r);
+                const c = parseInt(target.dataset.c);
+                handleMove(r, c);
+            }
+        }, { passive: false });
+
+        wordGridEl.addEventListener('touchend', handleEnd);
+
+        function renderQuestions() {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = '';
+
+            TRIVIA_DATA.forEach((item, index) => {
+                const isSolved = foundWords.has(item.id);
+                // Generar guiones bajos según la longitud de la respuesta oculta
+                const maskedWord = item.word.split('').map(() => '_').join(' ');
+
+                const card = document.createElement('div');
+                card.id = `question-card-${item.id}`;
+                card.className = `p-3.5 rounded-xl border transition-all ${
+                    isSolved 
+                        ? 'bg-emerald-50/90 border-emerald-300 shadow-sm' 
+                        : 'bg-white border-slate-200 hover:border-sky-300'
+                }`;
+
+                card.innerHTML = `
+                    <div class="flex items-start gap-3">
+                        <span class="w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 ${
+                            isSolved ? 'text-white' : 'bg-sky-100 text-sky-700'
+                        }" style="${isSolved ? `background-color: ${item.color};` : ''}">
+                            ${isSolved ? '✓' : index + 1}
+                        </span>
+                        <div class="flex-1">
+                            <p class="text-sm text-slate-700 leading-snug font-medium">${item.question}</p>
+                            <div class="mt-2 flex items-center justify-between">
+                                <span id="answer-badge-${item.id}" class="inline-block px-2.5 py-1 rounded-md text-xs font-extrabold tracking-widest ${
+                                    isSolved 
+                                        ? 'text-white shadow-xs' 
+                                        : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                }" style="${isSolved ? `background-color: ${item.color};` : ''}">
+                                    ${isSolved ? item.word : `${maskedWord} (${item.word.length} letras)`}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // ==========================================
+        // LÓGICA DE SELECCIÓN EN LA CUADRÍCULA
+        // ==========================================
+        function handleStart(r, c, e) {
+            if (e) e.preventDefault();
+            isSelecting = true;
+            startCell = { r, c };
+            currentSelection = [{ r, c }];
+            highlightSelection();
+        }
+
+        function handleMove(r, c) {
+            if (!isSelecting || !startCell) return;
+
+            const dr = r - startCell.r;
+            const dc = c - startCell.c;
+
+            // Validar que el movimiento sea estrictamente horizontal, vertical o diagonal de 45°
+            const absR = Math.abs(dr);
+            const absC = Math.abs(dc);
+
+            if (dr === 0 || dc === 0 || absR === absC) {
+                const steps = Math.max(absR, absC);
+                const stepR = dr === 0 ? 0 : dr / absR;
+                const stepC = dc === 0 ? 0 : dc / absC;
+
+                const newSelection = [];
+                for (let i = 0; i <= steps; i++) {
+                    newSelection.push({
+                        r: startCell.r + stepR * i,
+                        c: startCell.c + stepC * i
+                    });
+                }
+                currentSelection = newSelection;
+                highlightSelection();
+            }
+        }
+
+        function handleEnd() {
+            if (!isSelecting) return;
+            isSelecting = false;
+
+            if (currentSelection.length > 1) {
+                checkSelection();
+            }
+
+            // Limpiar selección visual temporal
+            document.querySelectorAll('.grid-cell.selecting').forEach(el => {
+                el.classList.remove('selecting');
+            });
+            currentSelection = [];
+            startCell = null;
+        }
+
+        function highlightSelection() {
+            document.querySelectorAll('.grid-cell.selecting').forEach(el => {
+                el.classList.remove('selecting');
+            });
+
+            currentSelection.forEach(({ r, c }) => {
+                const cell = getCellElement(r, c);
+                if (cell) cell.classList.add('selecting');
+            });
+        }
+
+        function checkSelection() {
+            const selectedWord = currentSelection.map(({ r, c }) => grid[r][c]).join('');
+            const reversedWord = selectedWord.split('').reverse().join('');
+
+            // Buscar coincidencia con palabras no encontradas aún
+            const matchedItem = TRIVIA_DATA.find(item => 
+                !foundWords.has(item.id) && (item.word === selectedWord || item.word === reversedWord)
+            );
+
+            if (matchedItem) {
+                markWordAsFound(matchedItem.id, currentSelection);
+                setStatus(`🎉 ¡Correcto! Encontraste "${matchedItem.word}".`, "success");
+            }
+        }
+
+        function markWordAsFound(wordId, coords) {
+            foundWords.add(wordId);
+            const itemData = TRIVIA_DATA.find(item => item.id === wordId);
+            const wordColor = itemData ? itemData.color : '#10b981';
+
+            // Marcar celdas con el color distintivo de cada palabra
+            coords.forEach(({ r, c }) => {
+                const cell = getCellElement(r, c);
+                if (cell) {
+                    cell.classList.remove('hint-highlight');
+                    cell.classList.add('found');
+                    cell.style.backgroundColor = wordColor;
+                }
+            });
+
+            // Actualizar tarjeta de pregunta y progreso
+            renderQuestions();
+            updateProgress();
+
+            // Verificar victoria
+            if (foundWords.size === TRIVIA_DATA.length) {
+                setTimeout(() => {
+                    document.getElementById('winModal').classList.remove('hidden');
+                    document.getElementById('winModal').classList.add('flex');
+                }, 400);
+            }
+        }
+
+        // ==========================================
+        // FUNCIONES DE AYUDA (PISTA Y REVELAR TODO)
+        // ==========================================
+        function giveHint() {
+            const remaining = placedWords.filter(pw => !foundWords.has(pw.id));
+            if (remaining.length === 0) return;
+
+            // Elegir una palabra pendiente al azar y resaltar su primera letra
+            const randomWord = remaining[Math.floor(Math.random() * remaining.length)];
+            const firstCoord = randomWord.coords[0];
+            const cell = getCellElement(firstCoord.r, firstCoord.c);
+
+            if (cell) {
+                // Quitar pistas anteriores
+                document.querySelectorAll('.hint-highlight').forEach(el => el.classList.remove('hint-highlight'));
+                cell.classList.add('hint-highlight');
+
+                const questionNumber = TRIVIA_DATA.findIndex(q => q.id === randomWord.id) + 1;
+                setStatus(`🔍 Pista para la pregunta #${questionNumber}: Busca la letra "${randomWord.word[0]}" resaltada en naranja.`, "warning");
+
+                setTimeout(() => {
+                    cell.classList.remove('hint-highlight');
+                }, 4000);
+            }
+        }
+
+        function revealAll() {
+            placedWords.forEach(pw => {
+                if (!foundWords.has(pw.id)) {
+                    foundWords.add(pw.id);
+                    const itemData = TRIVIA_DATA.find(item => item.id === pw.id);
+                    const wordColor = itemData ? itemData.color : '#10b981';
+                    pw.coords.forEach(({ r, c }) => {
+                        const cell = getCellElement(r, c);
+                        if (cell) {
+                            cell.classList.remove('hint-highlight');
+                            cell.classList.add('found');
+                            cell.style.backgroundColor = wordColor;
+                        }
+                    });
+                }
+            });
+            renderQuestions();
+            updateProgress();
+            setStatus("👀 Se han revelado todas las respuestas del tablero.", "info");
+        }
+
+        // ==========================================
+        // UTILIDADES DE INTERFAZ
+        // ==========================================
+        function getCellElement(r, c) {
+            return document.querySelector(`.grid-cell[data-r="${r}"][data-c="${c}"]`);
+        }
+
+        function updateProgress() {
+            const total = TRIVIA_DATA.length;
+            const current = foundWords.size;
+            document.getElementById('progressText').textContent = `${current} / ${total}`;
+
+            const trophy = document.getElementById('trophyIcon');
+            if (current === total) {
+                trophy.classList.remove('text-sky-300');
+                trophy.classList.add('text-emerald-400');
+            } else {
+                trophy.classList.add('text-sky-300');
+                trophy.classList.remove('text-emerald-400');
+            }
+        }
+
+        function setStatus(message, type) {
+            const banner = document.getElementById('statusBanner');
+            banner.textContent = message;
+            banner.className = "border-b px-6 py-2.5 text-center text-sm font-medium transition-all ";
+
+            if (type === "success") {
+                banner.className += "bg-emerald-50 border-emerald-200 text-emerald-800";
+            } else if (type === "warning") {
+                banner.className += "bg-amber-50 border-amber-200 text-amber-800";
+            } else {
+                banner.className += "bg-sky-50 border-sky-100 text-sky-800";
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('winModal').classList.add('hidden');
+            document.getElementById('winModal').classList.remove('flex');
+        }
+
+        // Arrancar aplicación al cargar la página
+        window.onload = initGame;
+    </script>
+</body>
+</html>
